@@ -290,7 +290,8 @@ select.sel{font:500 13px var(--font-body);padding:6px 8px;border:1px solid var(-
 .verdict{margin:0 14px 12px;padding:8px 12px;border-radius:6px;font-size:13.5px;border:1px solid var(--line);background:var(--panel-2)}
 .verdict.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,var(--panel))}
 .verdict.bad{border-color:var(--line)}
-.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px;padding:10px 12px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;padding:10px 12px}
+@media (min-width:900px){.mgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .mbtn{display:flex;flex-direction:column;gap:2px;align-items:flex-start;text-align:left;border:1px solid var(--line);border-radius:6px;padding:7px 10px;background:var(--panel);color:var(--ink);cursor:pointer;font-family:inherit}
 .mbtn .t{font:600 12px var(--font-display);letter-spacing:.09em;text-transform:uppercase}
 .mbtn .s{font:400 11.5px var(--font-mono);color:var(--ink-3)}
@@ -594,7 +595,7 @@ function cwSim({ N, iota, maxPeriods = 400, spp = 96, snapEvery = 6, steady = fa
 const cwDrop = (N, iota) => iota * (2 * N * N * N / 3 + N * N / 2 - N / 6);
 const cwRipple = (N, iota) => iota * N * (N + 1) / 2;
 
-/* ===== Van de Graaff / Pelletron =====
+/* ===== Van de Graaff =====
    Terminal esférico de radio a dentro de un tanque esférico de radio b (b = Infinity: al aire libre).
    Campo en la superficie del terminal: E = V·b/(a(b−a)); capacidad C = 4πε0·ab/(b−a). */
 const GASES_AISL = {
@@ -765,10 +766,13 @@ const MISIONES = [
     why: 'En la industria se usan implantadores electrostáticos: un voltaje de decenas o cientos de kV basta y dan corrientes de miliampere.' },
   { id: 'pixe', name: 'Análisis de materiales (PIXE)', parts: ['p'], E: [1, 4], I: 1e-9, dEE: 1e-3, size: 10, typical: 'tan',
     text: 'Medir qué elementos hay en una pintura, un hueso o un aerosol con los rayos X que emiten al recibir protones de unos MeV. La energía debe ser muy estable para comparar con patrones.',
-    why: 'Se usan aceleradores electrostáticos (Pelletron o tándem): energía muy estable y ajustable con una perilla.' },
+    why: 'Se usan aceleradores electrostáticos (Van de Graaff o tándem): energía muy estable y ajustable con una perilla.' },
   { id: 'ams', name: 'Datación con carbono 14', parts: ['C14'], E: [1, 40], I: 0, dEE: 1e-2, size: 10, typical: 'tan', special: 'ams',
     text: 'Contar átomos de ¹⁴C uno por uno (espectrometría de masas con aceleradores, AMS). El problema es separar el ¹⁴C del ¹⁴N, que pesa casi lo mismo y es un millón de millones de veces más abundante, y de las moléculas ¹²CH₂ y ¹³CH.',
     why: 'Solo el tándem sirve: el nitrógeno no forma iones negativos, así que nunca sale de la fuente, y el separador rompe las moléculas. Así trabaja el LEMA del IF-UNAM, con un Tandetron de 1 MV.' },
+  { id: 'nuc', name: 'Estructura de núcleos ligeros', parts: ['a', 'p', 'd'], E: [2, 40], I: 1e-9, dEE: 1e-3, size: 20, typical: ['es', 'tan', 'cyc'], special: 'nuc',
+    text: 'Estudiar los estados excitados de núcleos ligeros, por ejemplo los cúmulos de partículas alfa del ¹²C o del ¹⁰Be, con dispersión resonante y reacciones de transferencia. Hacen falta alfas, protones o deuterones de unos MeV a unas decenas de MeV, con la energía bien definida para separar estados cercanos y ajustable para barrer resonancias. Con nanoamperes sobre blancos delgados alcanza.',
+    why: 'En la práctica se usan aceleradores electrostáticos, con energía muy estable y ajustable (como el Van de Graaff de 5.5 MV del IF-UNAM, con protones, deuterones y alfas estables a una parte en 10⁴), y ciclotrones de energía variable (como el MC40 de la Universidad de Birmingham, que da protones de hasta 40 MeV y alfas de 10.8 a 40 MeV).' },
   { id: 'pet', name: 'Radioisótopos para PET', parts: ['p'], E: [10, 20], I: 20e-6, dEE: 1e-2, size: 3, typical: 'cyc',
     text: 'Producir ¹⁸F para tomografía por emisión de positrones con la reacción ¹⁸O(p,n)¹⁸F. Se necesitan protones de 10 a 20 MeV y decenas de microampere, en una máquina que quepa en el sótano de un hospital.',
     why: 'Los hospitales usan ciclotrones isócronos compactos: haz continuo, mucha corriente y un imán de un par de metros.' },
@@ -807,6 +811,8 @@ const RANGOS = [
   { tipo: 'syn', name: 'sincrotrón', r: [100, 7e6] },
 ];
 const misOf = id => MISIONES.find(m => m.id === id) || MISIONES[0];
+/* carga del haz: p, d, α y e⁻ salen con toda su carga; los demás iones, con 1+ de la fuente */
+const qBeam = key => ['p', 'd', 'a', 'e'].includes(key) ? PARTS[key].Z : 1;
 function accPart() { const mis = misOf(ACC.mis); return mis.parts.includes(ACC.part) ? ACC.part : mis.parts[0]; }
 
 /* evalúa la máquina elegida para la misión: energía, corriente, dispersión, tamaño y límites */
@@ -820,7 +826,7 @@ function evalMachine() {
     R.q = 1; m = massOf(key, R.q); R.T = R.q * c.V;
     R.size = 2 * b; R.sizeLab = `tanque de ≥ ${fmtLen(2 * b)} de diámetro (mínimo teórico con ${g.name}${c.gas === 'sf6' ? ' a 7 bar' : ' a 1 bar'})`;
     R.I = c.V <= 0.5 ? 10e-3 : 50e-6; R.dEE = c.V <= 0.5 ? 1e-3 : 1e-4;
-    R.info.push(c.V <= 0.5 ? 'Con menos de ~0.5 MV basta un multiplicador de Cockcroft–Walton: mucha corriente.' : 'Por encima de ~0.5 MV se carga con banda o cadena (Van de Graaff, Pelletron): menos corriente, energía muy estable.');
+    R.info.push(c.V <= 0.5 ? 'Con menos de ~0.5 MV basta un multiplicador de Cockcroft–Walton: mucha corriente.' : 'Por encima de ~0.5 MV se carga con una banda (Van de Graaff): menos corriente, energía muy estable.');
     if (c.V > 25) lim('bad', `${fmtSig(c.V, 3)} MV: más allá de unos 25 MV el aislamiento ya no alcanza (techo práctico del modelo).`);
     else if (c.gas === 'aire' && c.V > 1) lim('warn', 'En aire a presión atmosférica el tanque sale enorme: por eso se usa SF₆ a presión.');
     else lim('ok', `Campo en el terminal por debajo de la ruptura del ${g.name} (${fmtSig(Emax, 3)} MV/m usables).`);
@@ -850,7 +856,7 @@ function evalMachine() {
   } else if (tipo === 'lin') {
     const c = ACC.lin, Tin = isE ? 0.05 : 3, phis = isE ? 0 : -30;
     const Gmax = isE ? (c.sc ? 35 : 25) : (c.sc ? 10 : 5);
-    R.q = 1; m = massOf(key, 1); R.T = Tin + c.G * c.L * Math.cos(phis * DEG);
+    R.q = qBeam(key); m = massOf(key, R.q); R.T = Tin + R.q * c.G * c.L * Math.cos(phis * DEG);
     R.size = c.L + (isE ? 0.3 : 2); R.sizeLab = `${fmtLen(c.L)} de estructura + ${isE ? 'cañón' : 'fuente y RFQ'}`;
     R.I = isE ? (c.sc ? 1e-3 : 100e-6) : 1e-3; R.dEE = isE ? 2e-2 : 1e-3;
     if (c.G > Gmax) lim('bad', `${fmtSig(c.G, 3)} MV/m supera el gradiente práctico de ${c.sc ? 'cavidades superconductoras' : 'cavidades de cobre'} para ${isE ? 'electrones' : 'iones lentos'} (~${Gmax} MV/m en el modelo).`);
@@ -860,8 +866,8 @@ function evalMachine() {
     const zs = [], Ts = []; for (let i = 0; i <= 40; i++) { const z = c.L * i / 40; zs.push(z); Ts.push(Tin + c.G * z * Math.cos(phis * DEG)); }
     R.evo = { kind: 'lin', x: zs, y: Ts, xlab: 'z (m)', label: 'energía a lo largo del linac' };
   } else if (tipo === 'cyc') {
-    const c = ACC.cyc; R.q = 1; m = massOf(key, 1);
-    const tr = cycloTrack({ part: key, mode: c.mode, B: c.B, R: c.R, V: c.V, det: 0, phi0: c.mode === 'sincro' ? -30 : 0 });
+    const c = ACC.cyc; R.q = qBeam(key); m = massOf(key, R.q);
+    const tr = cycloTrack({ part: key, q: R.q, mode: c.mode, B: c.B, R: c.R, V: c.V, det: 0, phi0: c.mode === 'sincro' ? -30 : 0 });
     R.tr = tr; R.T = tr.fate === 'extraido' ? tr.T : tr.Tmax; R.extracted = tr.fate === 'extraido';
     R.size = 2 * c.R * 1.5; R.sizeLab = `imán de ~${fmtLen(3 * c.R)} de diámetro (radio de extracción ${fmtLen(c.R)})`;
     R.I = c.mode === 'isocrono' ? 100e-6 : c.mode === 'clasico' ? 10e-6 : 0.1e-6; R.dEE = c.mode === 'clasico' ? 1e-2 : 1e-3;
@@ -886,9 +892,9 @@ function evalMachine() {
     R.info.push(`${fmtSI(b.turns, '')} vueltas en ${fmtSI(b.tq, 's')} (un cuarto de ciclo de 50 Hz), ${fmtE(b.gainAvg)} por vuelta en promedio.`);
     R.evo = { kind: 'bet', x: b.t.map(v => v * 1e3), y: b.T, xlab: 't (ms)', label: 'energía durante el cuarto de ciclo' };
   } else if (tipo === 'syn') {
-    const c = ACC.syn, Tfin = TfromBrho(Math.min(c.B, 1e3) * c.rho, massOf(key, 1), 1), chain = !isE && Tfin > 1e4, Tinj = isE ? 100 : chain ? Tfin / 15 : 7;
-    const s = synchro({ part: key, rho: c.rho, fill: 0.6, Bmax: c.B, Tinj, tramp: 1, h: 1, Vrf: 1e9, I: isE ? 0.3 : 1e-6 });
-    R.q = 1; m = massOf(key, 1); R.T = s.Tend; R.syn = s;
+    const qs = qBeam(key), c = ACC.syn, Tfin = TfromBrho(Math.min(c.B, 1e3) * c.rho, massOf(key, qs), qs), chain = !isE && Tfin > 1e4, Tinj = isE ? 100 : chain ? Tfin / 15 : 7;
+    const s = synchro({ part: key, q: qs, rho: c.rho, fill: 0.6, Bmax: c.B, Tinj, tramp: 1, h: 1, Vrf: 1e9, I: isE ? 0.3 : 1e-6 });
+    R.q = qs; m = massOf(key, qs); R.T = s.Tend; R.syn = s;
     R.size = 2 * c.rho / 0.6; R.sizeLab = `anillo de ${fmtLen(s.C)} de circunferencia (${fmtLen(2 * c.rho / 0.6)} de diámetro)`;
     R.I = isE ? 0.3 : 1e-6; R.dEE = 1e-3;
     if (c.B > 9) lim('bad', `${fmtSig(c.B, 3)} T en los dipolos: más allá de lo que dan los imanes superconductores (~9 T en el modelo).`);
@@ -926,6 +932,10 @@ function evalMachine() {
   if (mis.special === 'luz') {
     const ring = tipo === 'syn', ec = ring ? R.extra.Ec : 0;
     C.push({ id: 'luz', ok: ring && ec >= 1000 && R.extra.Prad <= 2e6, text: `<b>Luz:</b> ${ring ? `energía crítica ${fmtSI(ec, 'eV')} (se pide ≥ 1 keV) · potencia radiada ${fmtSI(R.extra.Prad, 'W')} con 300 mA (máximo 2 MW)` : 'hace falta un anillo que guarde el haz circulando'}` });
+  }
+  if (mis.special === 'nuc') {
+    const ok = tipo !== 'lin' && tipo !== 'bet';
+    C.push({ id: 'nuc', ok, text: `<b>Energía ajustable:</b> ${tipo === 'es' || tipo === 'tan' ? 'se cambia el voltaje del terminal de manera continua' : tipo === 'cyc' ? 'se cambian el campo y la frecuencia (o el armónico de la RF)' : tipo === 'syn' ? 'se elige dónde termina la rampa' : tipo === 'lin' ? 'un linac de tubos de deriva está hecho para un perfil de velocidades fijo: su energía solo cambia por escalones' : 'no aplica'}` });
   }
   if (mis.special === 'hep' && tipo === 'syn' && !ACC.syn.col) C.push({ id: 'col', ok: false, text: '<b>Blanco fijo:</b> casi toda la energía se va en mover el centro de masas. Prueba el modo colisionador.' });
   R.checks = C; R.pass = C.every(c => c.ok);
@@ -1274,6 +1284,8 @@ function makeTimeline(sArr, vArr) {
   };
 }
 const energyTicks = e => ({ '-3': '1 keV', '-2': '10 keV', '-1': '100 keV', '0': '1 MeV', '1': '10 MeV', '2': '100 MeV', '3': '1 GeV', '4': '10 GeV', '5': '100 GeV', '6': '1 TeV', '7': '10 TeV' })[String(e)] || '';
+/* «a, b o c» */
+const listO = xs => xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' o ' + xs[xs.length - 1];
 const PT_CLS = key => key === 'e' ? 'e' : (key === 'p' || key === 'd' || key === 'a') ? '' : 'i';
 
 registerPage({
@@ -1296,7 +1308,7 @@ registerPage({
       misGrid.innerHTML = '';
       for (const m of MISIONES) {
         const b = el('button', { type: 'button', class: 'mbtn' + (m.id === ACC.mis ? ' on' : '') + (MIS_OK[m.id] ? ' done' : '') },
-          el('span', { class: 't' }, m.name), el('span', { class: 's' }, `${m.parts.map(k => PARTS[k].sym).join(' o ')} · ${m.special === 'hep' ? '√s ≥ 1 TeV' : fmtE(m.E[0], 2) + '–' + fmtE(m.E[1], 2)}`));
+          el('span', { class: 't' }, m.name), el('span', { class: 's' }, `${listO(m.parts.map(k => PARTS[k].sym))} · ${m.special === 'hep' ? '√s ≥ 1 TeV' : fmtE(m.E[0], 2) + '–' + fmtE(m.E[1], 2)}`));
         b.addEventListener('click', () => { ACC.mis = m.id; if (!m.parts.includes(ACC.part)) ACC.part = m.parts[0]; compute(); renderMissions(); controls(); refresh(); if (!ANIM.running) CUR.api.launch(); });
         misGrid.append(b);
       }
@@ -1305,7 +1317,7 @@ registerPage({
       const m = misOf(ACC.mis);
       misBody.innerHTML = '';
       misBody.append(el('div', { class: 'mt' }, m.name), el('div', { class: 'md' }, m.text),
-        el('div', { class: 'req' }, el('span', {}, `partícula: ${m.parts.map(k => PARTS[k].name).join(' o ')}`),
+        el('div', { class: 'req' }, el('span', {}, `partícula: ${listO(m.parts.map(k => PARTS[k].name))}`),
           el('span', {}, m.special === 'hep' ? 'energía en el choque: √s ≥ 1 TeV' : `energía: ${fmtE(m.E[0])} a ${fmtE(m.E[1])}`),
           m.I > 0 ? el('span', {}, `corriente ≥ ${fmtI(m.I)}`) : null, el('span', {}, `dispersión ≤ ${fmtSig(100 * m.dEE, 2)} %`), el('span', {}, `tamaño ≤ ${fmtLen(m.size)}`)));
     }
@@ -1346,7 +1358,7 @@ registerPage({
       if (R.pass) {
         const first = !MIS_OK[mis.id]; MIS_OK[mis.id] = ACC.tipo; saveState(); if (first) renderMissions();
         verdict.className = 'verdict ok';
-        verdict.innerHTML = `<b>¡Misión cumplida con un ${escHtml(MAQ[ACC.tipo].name.toLowerCase())}!</b> ` + (ACC.tipo === mis.typical ? escHtml(mis.why) : `Funciona en el modelo, aunque en la práctica… ${escHtml(mis.why)}`);
+        verdict.innerHTML = `<b>¡Misión cumplida con un ${escHtml(MAQ[ACC.tipo].name.toLowerCase())}!</b> ` + ([].concat(mis.typical).includes(ACC.tipo) ? escHtml(mis.why) : `Funciona en el modelo, aunque en la práctica… ${escHtml(mis.why)}`);
       } else { verdict.className = 'verdict bad'; verdict.innerHTML = `Faltan ${R.checks.filter(c => !c.ok).length} requisitos. Cambia las perillas o prueba otro tipo de máquina.`; }
       infoL.innerHTML = ''; for (const t of R.info) infoL.append(el('li', {}, t));
       const b = betaOf(R.T, R.m), g = gammaOf(R.T, R.m), items = [
@@ -1574,7 +1586,7 @@ registerPage({
     explainBlock(ui.explain, [
       { h: 'Dos maneras de dar energía', html: `<p>Una partícula de carga <var>q</var> gana <var>q</var>·Δ<var>V</var> al cruzar una diferencia de potencial. Los <b>electrostáticos</b> lo hacen de una vez: un terminal a millones de volts y un tubo con anillos. Están limitados por las chispas: más allá de unas decenas de MV el aislamiento no aguanta.</p><p>Los de <b>radiofrecuencia</b> hacen cruzar a la partícula muchas veces un voltaje pequeño que cambia de signo: ganan poco en cada paso, pero pueden repetirlo miles o millones de veces. Unos lo hacen en línea recta (<b>linac</b>) y otros la curvan con un imán para reusar el mismo hueco (<b>ciclotrón</b>, <b>sincrotrón</b>). El <b>betatrón</b> usa inducción: un flujo magnético que crece empuja al electrón como a la corriente en el secundario de un transformador.</p>` },
       { h: 'Lo que limita a cada uno', html: `<ul><li><b>Electrostático y tándem</b>: la ruptura del gas aislante; a cambio, energía estable al 0.01 % y ajustable.</li><li><b>Ciclotrón clásico</b>: la masa relativista atrasa a la partícula respecto a la RF (unos 10–20 MeV para protones).</li><li><b>Linac</b>: el gradiente que aguantan las cavidades; se compensa con longitud.</li><li><b>Betatrón y sincrotrón de electrones</b>: la radiación sincrotrón, que crece como <var>E</var>⁴/ρ.</li><li><b>Sincrotrón de protones</b>: el campo de los dipolos (hierro ~2 T, superconductores ~8–9 T) y el tamaño del anillo.</li></ul>` },
-      { h: 'Pruébalo', html: `<ul><li><b>PET</b> con un ciclotrón <b>clásico</b>: sube el campo y el radio y verás que no pasa de unos MeV. Cambia a <b>isócrono</b>.</li><li><b>Carbono 14</b> con un electrostático: la energía alcanza, pero no se separa del nitrógeno. ¿Qué tiene el tándem que no tenga el otro? Luego resuélvelo como el LEMA: tándem de 1 MV con separador de gas denso.</li><li><b>Colisionador</b> con electrones en lugar de protones y el mismo anillo: mira la pérdida por vuelta.</li><li><b>Radioterapia</b> con un betatrón: funciona, pero con poca corriente. Así se trataba a los pacientes en los años cincuenta.</li><li>Pasa el sincrotrón a <b>blanco fijo</b> y compara la √s con la del colisionador: con 7 TeV contra un protón quieto solo quedan unos 115 GeV para crear partículas.</li></ul>` },
+      { h: 'Pruébalo', html: `<ul><li><b>PET</b> con un ciclotrón <b>clásico</b>: sube el campo y el radio y verás que no pasa de unos MeV. Cambia a <b>isócrono</b>.</li><li><b>Carbono 14</b> con un electrostático: la energía alcanza, pero no se separa del nitrógeno. ¿Qué tiene el tándem que no tenga el otro? Luego resuélvelo como el LEMA: tándem de 1 MV con separador de gas denso.</li><li><b>Colisionador</b> con electrones en lugar de protones y el mismo anillo: mira la pérdida por vuelta.</li><li><b>Núcleos ligeros</b> con alfas: resuélvela con un tándem y con un ciclotrón isócrono. ¿Por qué no sirven el ciclotrón clásico ni el linac?</li><li><b>Radioterapia</b> con un betatrón: funciona, pero con poca corriente. Así se trataba a los pacientes en los años cincuenta.</li><li>Pasa el sincrotrón a <b>blanco fijo</b> y compara la √s con la del colisionador: con 7 TeV contra un protón quieto solo quedan unos 115 GeV para crear partículas.</li></ul>` },
     ]);
     function refresh() { R = evalMachine(); buildSchematic(); plots(); texts(); if (!ANIM.running) draw(1); }
     function draw(p) { if (AN) AN.draw(p); if (p >= 1 || Math.floor(p * 30) % 3 === 0) plots(p); }
@@ -1790,7 +1802,7 @@ registerPage({
     }
     explainBlock(ui.explain, [
       { h: 'Cockcroft–Walton', html: `<p>Cada etapa es un <b>doblador de voltaje</b>: en un semiciclo un diodo carga un capacitor de la columna oscilante al voltaje pico; en el otro, ese capacitor «monta» sobre la fuente y pasa su carga, por otro diodo, a la columna de salida, que queda 2<var>V</var>₀ más arriba. Apilando <var>N</var> etapas se llega a 2<var>N</var>·<var>V</var>₀ sin carga.</p><p>Con carga, cada ciclo se lleva <var>I</var>/<var>f</var> de carga y las etapas de arriba la reciben de segunda mano: la <b>caída</b> crece como <var>N</var>³ y el <b>rizo</b> como <var>N</var>², ambos proporcionales a <var>I</var>/(<var>f</var>·<var>C</var>). Por eso hay un número óptimo de etapas y por eso los multiplicadores modernos trabajan a decenas de kHz. En 1932 Cockcroft y Walton rompieron el litio con protones de unos cientos de keV salidos de un aparato así. Hoy los <b>Tandetron</b>, como el del <a href="#lema">LEMA</a> del IF-UNAM, cargan su terminal con un multiplicador de este tipo, de estado sólido, en lugar de una banda.</p>` },
-      { h: 'Van de Graaff y Pelletron', html: `<p>Una banda aislante recibe carga de un peine a unos kV en la base y la entrega a otro peine dentro del terminal. Dentro de un conductor hueco no hay campo, así que la carga siempre puede entrar aunque el terminal ya esté a millones de volts. El voltaje sube como <var>I</var>/<var>C</var> hasta que la corriente de la columna de resistencias (y la del haz) equilibra la de la banda, o hasta que salta una <b>chispa</b>.</p><p>En el <b>Pelletron</b> la banda se cambia por una cadena de cilindros metálicos unidos por eslabones aislantes que se cargan por inducción: más estable, más duradera, menos polvo. El Pelletron de 3 MV del IF-UNAM y el Tandem de 6 MV del ININ son de esta familia; el Tandetron de 1 MV del LEMA usa en cambio un multiplicador (ver las páginas del tándem y del LEMA).</p>` },
+      { h: 'Van de Graaff', html: `<p>Una banda aislante recibe carga de un peine a unos kV en la base y la entrega a otro peine dentro del terminal. Dentro de un conductor hueco no hay campo, así que la carga siempre puede entrar aunque el terminal ya esté a millones de volts. El voltaje sube como <var>I</var>/<var>C</var> hasta que la corriente de la columna de resistencias (y la del haz) equilibra la de la banda, o hasta que salta una <b>chispa</b>. Un voltímetro generador, unas puntas de corona y el imán de análisis mantienen el voltaje estable.</p><p><b>El 5.5 MV del IF-UNAM</b> es un Van de Graaff vertical de 8 m de alto y 40 toneladas, instalado en 1988 en una torre de unos 30 m. Su columna mide unos 7 m y tiene 131 platos equipotenciales unidos por resistencias de 1000 MΩ (en total unos 131 GΩ: a 5.5 MV la columna se lleva unos 42 µA). La fuente de iones va en el terminal: un plasma de radiofrecuencia que brilla rosa mexicano con hidrógeno y azul con helio. Un imán de análisis de 7 toneladas, con el campo medido por resonancia magnética nuclear, fija la energía, estable a una parte en 10⁴. Se usa para análisis de materiales y para estudiar núcleos ligeros formados por cúmulos de partículas.</p><ul class="src-list"><li>Fuentes (consultadas el 28 sep 2026): E. Andrade, <a href="https://nucleares.unam.mx/~hess/Escuela2015/Andrade.pdf" target="_blank" rel="noopener">«El acelerador Van de Graaff de 5.5 MV»</a> (Escuela Mexicana de Física Nuclear, 2015); <a href="https://laboratorios.fisica.unam.mx/background?id=13" target="_blank" rel="noopener">IF-UNAM, acelerador Van de Graaff de 5.5 MV</a>; <a href="https://www.gob.mx/inin/acciones-y-programas/acelerador-tandem-van-de-graaff-73303" target="_blank" rel="noopener">ININ, Tandem de 6 MV</a>.</li></ul>` },
       { h: 'La chispa manda', html: `<p>El campo en la superficie de una esfera de radio <var>a</var> centrada en un tanque de radio <var>b</var> es <var>E</var> = <var>V</var>·<var>b</var>/(<var>a</var>(<var>b</var> − <var>a</var>)). Para un tanque dado el voltaje máximo sale cuando <b><var>a</var> = <var>b</var>/2</b>: <var>V</var>ₘₐₓ = <var>E</var>ᵣ·<var>b</var>/4. Un terminal pequeño concentra el campo; uno muy grande deja poco hueco con el tanque.</p><p>El <b>SF₆</b> aguanta unas tres veces el campo del aire y la ruptura crece casi proporcional a la presión: con 7 bar de SF₆ caben varios MV en un tanque de un par de metros. El modelo usa solo una fracción del campo crítico de libro (75 % en aire, 40 % en SF₆ a presión) porque las superficies reales, el polvo y las áreas grandes rompen antes: es un supuesto.</p><ul><li><b>Pruébalo:</b> pon el generador al aire con una esfera de 15 cm, como el de las ferias de ciencias: unos 300 kV.</li><li>En el tanque mueve <var>a</var> y busca el máximo de la curva de abajo.</li></ul>` },
     ]);
     function rebuild() { s.innerHTML = ''; s.append(SYM.defs()); model(); if (ES2.mode === 'cw') buildCW(); else buildVDG(); readouts(); draw(ANIM.running ? ANIM.p : 1); }
@@ -1963,7 +1975,7 @@ registerPage({
     explainBlock(ui.explain, [
       { h: 'Por qué funciona', html: `<p>El ion sale de la fuente con carga −1 y el terminal a +<var>V</var> lo atrae: gana <var>e</var>·<var>V</var>. En el terminal cruza una lámina de carbono de unos µg/cm² (o un tubo con gas) y pierde varios electrones por choques. Sale con carga +<var>q</var> y ahora el mismo terminal lo empuja hacia tierra: gana <var>q</var>·<var>e</var>·<var>V</var>. Total: <b>(1 + <var>q</var>)·<var>e</var>·<var>V</var></b>.</p><p>La carga de salida no es fija: es una distribución que depende de la velocidad del ion en la lámina. Cuanto más rápido va, más electrones pierde. La fórmula empírica de Nikolaev y Dmitriev da la carga media <var>q̄</var>/<var>Z</var> = [1 + (<var>v</var>/(<var>Z</var>^0.45·3.6·10⁸ cm/s))^(−1/0.6)]^(−0.6). El imán de análisis se ajusta a una sola carga; el resto se pierde.</p>` },
       { h: 'Datación con carbono 14', html: `<p>El tándem es la base de la <b>espectrometría de masas con aceleradores</b> (AMS). El ¹⁴N, que tiene casi la misma masa que el ¹⁴C, <b>no forma iones negativos</b>: no sale de la fuente (elige N en los botones). Las moléculas de masa 14 (¹²CH₂⁻, ¹³CH⁻) sí salen, pero al perder tres o más electrones en el separador se rompen por repulsión de Coulomb; los AMS compactos logran lo mismo con carga 1+ y un separador de gas tan denso que los choques rompen las moléculas. Así se cuentan átomos de ¹⁴C uno por uno en miligramos de muestra: es lo que hace el <a href="#lema">LEMA</a>.</p><p>La fuente trabaja en tierra, lejos del terminal: se puede cambiar de muestra, enfriar y reparar sin abrir el tanque. En un electrostático de una etapa la fuente viaja dentro del terminal a millones de volts.</p>` },
-      { h: 'En México', html: `<ul><li>El <b>LEMA</b> del IF-UNAM es un tándem dedicado a contar átomos: un Tandetron de 1 MV para espectrometría de masas con aceleradores, en operación desde 2013. Tiene su propia página: <a href="#lema">El LEMA</a>.</li><li>El <b>Pelletron</b> del IF-UNAM es un tándem de 3 MV (modelo 9SDH-2 de National Electrostatics) que opera desde 1995; acelera iones de 2 a 30 MeV según el ion y su carga, para análisis y modificación de materiales.</li><li>El <b>Tandem Van de Graaff</b> del ININ, en Salazar, Estado de México, tiene un generador de 6 MV y opera desde 1968; se usa para análisis con haces de iones (RBS, PIXE, NRA, ERDA).</li></ul><p><b>Pruébalo:</b> ¹²C a 3 MV da sobre todo 4+ y 3+ (15 y 12 MeV). ¿Qué pasa con el oro? Busca a qué voltaje el ¹⁴C sale mayoritariamente como 3+ en la lámina: así trabajaban los primeros AMS; los compactos como el del LEMA usan 1+ y gas denso.</p><ul class="src-list"><li>Fuentes (consultadas el 28 sep 2026): <a href="https://www.scielo.org.mx/scielo.php?script=sci_arttext&pid=S2448-56912016000100057" target="_blank" rel="noopener">IF-UNAM (SciELO)</a>, <a href="https://labunam.unam.mx/micrositio/antecedentes.php?il=137" target="_blank" rel="noopener">LabUNAM, LEMA</a>, <a href="https://www.gob.mx/inin/acciones-y-programas/acelerador-tandem-van-de-graaff-73303" target="_blank" rel="noopener">ININ</a>.</li></ul>` },
+      { h: 'En México', html: `<ul><li>El <b>LEMA</b> del IF-UNAM es un tándem dedicado a contar átomos: un Tandetron de 1 MV para espectrometría de masas con aceleradores, en operación desde 2013. Tiene su propia página: <a href="#lema">El LEMA</a>.</li><li>El <b>Tandem Van de Graaff</b> del ININ, en Salazar, Estado de México, tiene un generador de 6 MV y opera desde 1968; se usa para análisis con haces de iones (RBS, PIXE, NRA, ERDA).</li><li>El <b>Van de Graaff de 5.5 MV</b> del IF-UNAM es de una sola etapa: la fuente de iones va en el terminal (ver <a href="#electrostaticos">Electrostáticos</a>).</li></ul><p><b>Pruébalo:</b> ¹²C a 3 MV da sobre todo 4+ y 3+ (15 y 12 MeV). ¿Qué pasa con el oro? Busca a qué voltaje el ¹⁴C sale mayoritariamente como 3+ en la lámina: así trabajaban los primeros AMS; los compactos como el del LEMA usan 1+ y gas denso.</p><ul class="src-list"><li>Fuentes (consultadas el 28 sep 2026): <a href="https://labunam.unam.mx/micrositio/antecedentes.php?il=137" target="_blank" rel="noopener">LabUNAM, LEMA</a>, <a href="https://www.gob.mx/inin/acciones-y-programas/acelerador-tandem-van-de-graaff-73303" target="_blank" rel="noopener">ININ</a>.</li></ul>` },
     ]);
     function refresh() { build(); plots(); readouts(); if (!ANIM.running) draw(ANIM.p); }
     controls(); refresh();
@@ -2454,8 +2466,8 @@ registerPage({
     renderLegend(ui.legend, [{ c: 'rfp', name: 'D positiva', sq: true }, { c: 'rfn', name: 'D negativa', sq: true }, { c: 'prot', name: 'órbita' }, { c: 'dip', name: 'colinas (isócrono)', sq: true }]);
     explainBlock(ui.explain, [
       { h: 'La idea de Lawrence', html: `<p>En un campo <var>B</var> una partícula da vueltas con radio <var>r</var> = <var>p</var>/(<var>qB</var>) y frecuencia <b><var>f</var> = <var>qB</var>/(2π<var>m</var>)</b>, que no depende de la energía: al ganar energía el radio crece, pero la vuelta dura lo mismo. Una RF de frecuencia fija entre las dos des empuja a la partícula en cada cruce. La energía máxima la fija el imán: <var>T</var> ≈ (<var>qBR</var>)²/(2<var>m</var>).</p><p>El primer ciclotrón que funcionó (Lawrence y Livingston, enero de 1931) medía unos 11 cm de diámetro y llevó iones de hidrógeno a 80 keV. En unos años ya había ciclotrones de más de un metro.</p>` },
-      { h: 'La relatividad lo arruina… y cómo se arregla', html: `<p>Con la energía crece la masa: la vuelta dura γ veces más y la partícula llega cada vez más tarde a la brecha (mira el reloj de fase). Cuando pasa de +90° empieza a frenarse. Para protones el ciclotrón clásico se queda en 10–20 MeV; bajar la fase inicial y la frecuencia un poco (desintonía negativa) estira el límite, pero no mucho.</p><ul><li><b>Sincrociclotrón</b> (1946): la frecuencia de la RF baja durante la aceleración siguiendo a la partícula. Funciona gracias a la estabilidad de fase, pero acelera por pulsos y da poca corriente.</li><li><b>Isócrono</b> (idea de Thomas, 1938): el campo crece con el radio como γ(<var>r</var>) para que la vuelta dure siempre lo mismo. Un campo que crece hacia afuera desenfoca en vertical; los sectores de campo alto y bajo (colinas y valles, a veces en espiral) lo compensan. Así son los ciclotrones de hospital y el anillo de 590 MeV y 2.4 mA del PSI, el más potente del mundo.</li></ul>` },
-      { h: 'Pruébalo', html: `<ul><li>Con el <b>clásico</b> y 50 kV los protones no pasan de unos 5 MeV aunque el imán permita más. Prueba fase inicial −60° y desintonía de −2 ‰.</li><li>Cambia a <b>isócrono</b> con los mismos valores: la fase se queda en 0° y la partícula sale.</li><li>Pon <b>electrones</b> en el clásico: se desfasan a unos keV, porque su masa es 1800 veces menor y se vuelven relativistas enseguida.</li><li>En el <b>sincrociclotrón</b> sube el radio a 2 m y el campo a 2 T: mira cómo baja la frecuencia.</li></ul><ul class="src-list"><li>Fuentes (consultadas el 28 sep 2026): <a href="https://history.aip.org/history/exhibits/lawrence/first_text.htm" target="_blank" rel="noopener">AIP, Lawrence and the Cyclotron</a>; <a href="https://www.psi.ch/en/cas/ring" target="_blank" rel="noopener">PSI, The Ring Cyclotron</a>.</li></ul>` },
+      { h: 'La relatividad lo arruina… y cómo se arregla', html: `<p>Con la energía crece la masa: la vuelta dura γ veces más y la partícula llega cada vez más tarde a la brecha (mira el reloj de fase). Cuando pasa de +90° empieza a frenarse. Para protones el ciclotrón clásico se queda en 10–20 MeV; bajar la fase inicial y la frecuencia un poco (desintonía negativa) estira el límite, pero no mucho.</p><ul><li><b>Sincrociclotrón</b> (1946): la frecuencia de la RF baja durante la aceleración siguiendo a la partícula. Funciona gracias a la estabilidad de fase, pero acelera por pulsos y da poca corriente.</li><li><b>Isócrono</b> (idea de Thomas, 1938): el campo crece con el radio como γ(<var>r</var>) para que la vuelta dure siempre lo mismo. Un campo que crece hacia afuera desenfoca en vertical; los sectores de campo alto y bajo (colinas y valles, a veces en espiral) lo compensan. Así son los ciclotrones de hospital y el anillo de 590 MeV y 2.4 mA del PSI, el más potente del mundo.</li></ul><p>Un ciclotrón de <b>energía variable</b> cambia el campo, la frecuencia e incluso el armónico de la RF. El MC40 de la Universidad de Birmingham da protones de 2.7 a 40 MeV, deuterones de 5.4 a 20 MeV, ³He de 8 a 50 MeV y alfas de 10.8 a 40 MeV, para radioisótopos y para física nuclear de bajas energías.</p>` },
+      { h: 'Pruébalo', html: `<ul><li>Con el <b>clásico</b> y 50 kV los protones no pasan de unos 5 MeV aunque el imán permita más. Prueba fase inicial −60° y desintonía de −2 ‰.</li><li>Cambia a <b>isócrono</b> con los mismos valores: la fase se queda en 0° y la partícula sale.</li><li>Pon <b>electrones</b> en el clásico: se desfasan a unos keV, porque su masa es 1800 veces menor y se vuelven relativistas enseguida.</li><li>En el <b>sincrociclotrón</b> sube el radio a 2 m y el campo a 2 T: mira cómo baja la frecuencia.</li></ul><ul class="src-list"><li>Fuentes (consultadas el 28 sep 2026): <a href="https://history.aip.org/history/exhibits/lawrence/first_text.htm" target="_blank" rel="noopener">AIP, Lawrence and the Cyclotron</a>; <a href="https://www.psi.ch/en/cas/ring" target="_blank" rel="noopener">PSI, The Ring Cyclotron</a>; <a href="https://www.birmingham.ac.uk/about/college-of-engineering-and-physical-sciences/physics-and-astronomy/facilities/mc40-cyclotron-facility" target="_blank" rel="noopener">Universidad de Birmingham, MC40</a>.</li></ul>` },
     ]);
     function refresh() { build(); readouts(); plots(); if (!ANIM.running) draw(1); }
     controls(); refresh();
